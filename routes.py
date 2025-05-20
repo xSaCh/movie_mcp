@@ -10,6 +10,7 @@ from db import get_db
 from models import (
     FilmBase,
     MetaData,
+    Genre,
 )
 
 router = APIRouter()
@@ -78,6 +79,22 @@ async def discover_tmdb(type: Literal["movie", "tv"], request: Request):
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
 
 
+@router.get("/genres/{type}", response_model=List[Genre])
+async def get_tmdb_genres(type: Literal["movie", "tv"]):
+    """
+    Get the list of official genres for movies or TV series from TMDB.
+    """
+    try:
+        return await tmdb_client.get_genres(media_type=type)
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=e.response.status_code, detail=str(e))
+    except Exception as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"An unexpected error occurred: {str(e)}",
+        )
+
+
 @router.get("/watchlist", response_model=List[WatchlistItem])
 def get_watchlist(db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
@@ -109,29 +126,62 @@ def get_watchlist(db: sqlite3.Connection = Depends(get_db)):
 @router.post(
     "/watchlist", response_model=FilmBase, status_code=http_status.HTTP_201_CREATED
 )
-def add_to_watchlist(film: FilmBase, db: sqlite3.Connection = Depends(get_db)):
+async def add_to_watchlist(
+    film_id: int, type: Literal["movie", "tv"], db: sqlite3.Connection = Depends(get_db)
+):
+    print("HEELO", film_id, type)
     cursor = db.cursor()
     try:
+        # Fetch film details from TMDB API
+        film_base, meta_data, genres_list = await tmdb_client.get_details(
+            media_type=type, tmdb_id=film_id
+        )
+
+        # Insert into Film table
         cursor.execute(
-            "INSERT INTO Film (film_id, title, release_date, type, status, watched_date) VALUES (?, ?, ?, ?, ?, ?)",
+            """
+            INSERT INTO Film (film_id, title, release_date, type, status, watched_date)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
             (
-                film.film_id,
-                film.title,
-                film.release_date,
-                film.type,
-                film.status,
-                film.watched_date,
+                film_base.film_id,
+                film_base.title,
+                film_base.release_date,
+                film_base.type,
+                "PlanToWatch",  # Default status
+                None,  # Default watched_date
             ),
         )
 
-        cursor.execute("INSERT INTO Meta (film_id) VALUES (?)", (film.film_id,))
+        # Insert into Meta table
+        cursor.execute(
+            """
+            INSERT INTO Meta (film_id, imdb_id, runtime, plot, rating, poster_url)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                film_base.film_id,
+                meta_data.imdb_id,
+                meta_data.runtime,
+                meta_data.plot,
+                meta_data.rating,
+                meta_data.poster_url,
+            ),
+        )
+
+        # Insert into Genre table
+        for genre in genres_list:
+            cursor.execute(
+                "INSERT INTO Genre (film_id, name) VALUES (?, ?)",
+                (film_base.film_id, genre),
+            )
 
         db.commit()
     except sqlite3.IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
-            detail=f"Film with ID {film.film_id} already in watchlist",
+            detail=f"Film with ID {film_id} already in watchlist",
         )
     except Exception as e:
         db.rollback()
@@ -139,7 +189,7 @@ def add_to_watchlist(film: FilmBase, db: sqlite3.Connection = Depends(get_db)):
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Database error: {str(e)}",
         )
-    return film
+    return film_base
 
 
 @router.patch("/watchlist/{film_id}", response_model=WatchlistItem)

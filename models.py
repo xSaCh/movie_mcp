@@ -21,5 +21,5 @@ class MetaData(BaseModel):
 
 
 class Genre(BaseModel):
-    film_id: int
+    id: int
     name: str

@@ -161,3 +161,17 @@ async def discover(
         return [
             _map_tmdb_to_filmbase(item, media_type) for item in data.get("results", [])
         ]
+
+
+async def get_genres(media_type: Literal["movie", "tv"]) -> List[Dict[str, Any]]:
+    """
+    Fetches the official list of genres for a given media type from TMDB.
+    Args:
+        media_type: The type of media ('movie' or 'tv').
+    Returns:
+        A list of genre dictionaries, each containing 'id' and 'name'.
+    """
+    async with httpx.AsyncClient(base_url=str(settings.tmdb_base_url)) as client:
+        endpoint = f"/genre/{media_type}/list"
+        data = await _make_request(client, "GET", endpoint)
+        return data.get("genres", [])
