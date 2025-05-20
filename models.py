@@ -6,7 +6,7 @@ from pydantic import BaseModel
 class FilmBase(BaseModel):
     film_id: int
     title: str
-    release_date: date
+    release_date: Optional[date] = None
     type: Literal["movie", "series"]
     status: Literal["PlanToWatch", "Watching", "Watched", "Dropped", "OnHold"]
     watched_date: Optional[date] = None

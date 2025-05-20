@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status as http_s
 import sqlite3
 from typing import List, Literal, Optional, Dict, Any, Tuple
 from datetime import date
-
+import httpx
 from pydantic import BaseModel
 
 import tmdb_client
@@ -10,12 +10,9 @@ from db import get_db
 from models import (
     FilmBase,
     MetaData,
-)  # Genre model is also in models.py but not directly used as input/output here for lists
-import httpx
+)
 
 router = APIRouter()
-
-# Pydantic models for API request/response structures
 
 
 class FilmDetailsResponse(FilmBase):
@@ -31,16 +28,13 @@ class WatchlistUpdate(BaseModel):
 
 
 class WatchlistItem(FilmBase):
-    # Inherits film_id, title, release_date, type, status, watched_date
+
     imdb_id: Optional[str] = None
     runtime: Optional[int] = None
     plot: Optional[str] = None
     rating: Optional[float] = None
     poster_url: Optional[str] = None
     genres: Optional[List[str]] = None
-
-
-# TMDB Passthrough Endpoints
 
 
 @router.get("/search", response_model=List[FilmBase])
@@ -76,15 +70,12 @@ async def get_tmdb_trending(
 
 @router.get("/discover/{type}", response_model=List[FilmBase])
 async def discover_tmdb(type: Literal["movie", "tv"], request: Request):
-    # Convert query params from Request object to a dictionary for the client
+
     filters: Dict[str, Any] = dict(request.query_params)
     try:
         return await tmdb_client.discover(media_type=type, filters=filters)
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
-
-
-# Watchlist CRUD Endpoints
 
 
 @router.get("/watchlist", response_model=List[WatchlistItem])
@@ -106,7 +97,6 @@ def get_watchlist(db: sqlite3.Connection = Depends(get_db)):
         genre_names_str = row_dict.pop("genre_names", None)
         genres_list = genre_names_str.split(",") if genre_names_str else None
 
-        # Ensure release_date and watched_date are parsed correctly if they are strings
         if isinstance(row_dict.get("release_date"), str):
             row_dict["release_date"] = date.fromisoformat(row_dict["release_date"])
         if isinstance(row_dict.get("watched_date"), str):
@@ -133,11 +123,11 @@ def add_to_watchlist(film: FilmBase, db: sqlite3.Connection = Depends(get_db)):
                 film.watched_date,
             ),
         )
-        # Insert an empty/minimal Meta row
+
         cursor.execute("INSERT INTO Meta (film_id) VALUES (?)", (film.film_id,))
-        # No genres are added by default with this POST, as per "empty Meta/Genre rows"
+
         db.commit()
-    except sqlite3.IntegrityError:  # film_id likely already exists
+    except sqlite3.IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=http_status.HTTP_409_CONFLICT,
@@ -158,7 +148,6 @@ def update_watchlist_item(
 ):
     cursor = db.cursor()
 
-    # Check if film exists
     cursor.execute("SELECT film_id FROM Film WHERE film_id = ?", (film_id,))
     if not cursor.fetchone():
         raise HTTPException(
@@ -186,7 +175,6 @@ def update_watchlist_item(
             detail=f"Database error: {str(e)}",
         )
 
-    # Fetch and return the updated item
     cursor.execute(
         """
         SELECT
@@ -201,9 +189,7 @@ def update_watchlist_item(
     )
 
     updated_row = cursor.fetchone()
-    if (
-        not updated_row
-    ):  # Should not happen if update was successful and initial check passed
+    if not updated_row:
         raise HTTPException(
             status_code=http_status.HTTP_404_NOT_FOUND,
             detail="Updated film not found, this should not happen.",
@@ -225,7 +211,6 @@ def update_watchlist_item(
 def delete_watchlist_item(film_id: int, db: sqlite3.Connection = Depends(get_db)):
     cursor = db.cursor()
 
-    # Check if film exists before attempting to delete
     cursor.execute("SELECT film_id FROM Film WHERE film_id = ?", (film_id,))
     if not cursor.fetchone():
         raise HTTPException(
@@ -234,15 +219,13 @@ def delete_watchlist_item(film_id: int, db: sqlite3.Connection = Depends(get_db)
         )
 
     try:
-        # Delete from child tables first if no ON DELETE CASCADE is set up
+
         cursor.execute("DELETE FROM Genre WHERE film_id = ?", (film_id,))
         cursor.execute("DELETE FROM Meta WHERE film_id = ?", (film_id,))
         cursor.execute("DELETE FROM Film WHERE film_id = ?", (film_id,))
 
-        if (
-            cursor.rowcount == 0
-        ):  # Should be caught by the check above, but as a safeguard
-            db.rollback()  # Rollback if Film delete affected 0 rows unexpectedly
+        if cursor.rowcount == 0:
+            db.rollback()
             raise HTTPException(
                 status_code=http_status.HTTP_404_NOT_FOUND,
                 detail=f"Film with ID {film_id} not found in watchlist for deletion.",
@@ -255,4 +238,4 @@ def delete_watchlist_item(film_id: int, db: sqlite3.Connection = Depends(get_db)
             detail=f"Database error: {str(e)}",
         )
 
-    return  # FastAPI handles 204 No Content response automatically
+    return

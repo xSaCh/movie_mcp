@@ -3,7 +3,7 @@ import asyncio
 import time
 from typing import Literal, List, Tuple, Dict, Any, Optional
 from pydantic_settings import BaseSettings
-from pydantic import BaseModel, Field, HttpUrl, validator
+from pydantic import BaseModel, Field, HttpUrl
 from datetime import date, datetime
 
 from models import FilmBase, MetaData
@@ -20,8 +20,8 @@ class TMDBSettings(BaseSettings):
 
 settings = TMDBSettings()
 
-# Basic rate limiting state
-RATE_LIMIT_REMAINING = 30  # Default based on TMDB docs, will be updated by headers
+
+RATE_LIMIT_REMAINING = 30
 RATE_LIMIT_RESET_TIME = 0
 
 
@@ -32,7 +32,7 @@ async def _handle_rate_limit(response: httpx.Response):
     if "x-ratelimit-reset" in response.headers:
         RATE_LIMIT_RESET_TIME = int(response.headers["x-ratelimit-reset"])
 
-    if RATE_LIMIT_REMAINING <= 1:  # Leave a small buffer
+    if RATE_LIMIT_REMAINING <= 1:
         wait_time = max(0, RATE_LIMIT_RESET_TIME - time.time())
         if wait_time > 0:
             print(f"Rate limit approaching. Waiting for {wait_time:.2f} seconds.")
@@ -48,14 +48,14 @@ async def _make_request(
     params = params or {}
     params["api_key"] = settings.tmdb_api_key
 
-    await _handle_rate_limit(httpx.Response(200))  # Check before making a request
+    await _handle_rate_limit(httpx.Response(200))
 
     response = await client.request(method, url, params=params)
 
-    await _handle_rate_limit(response)  # Update after making a request
+    await _handle_rate_limit(response)
 
     if response.status_code != 200:
-        response.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx
+        response.raise_for_status()
     return response.json()
 
 
@@ -65,7 +65,7 @@ def _parse_release_date(release_date_str: Optional[str]) -> Optional[date]:
     try:
         return datetime.strptime(release_date_str, "%Y-%m-%d").date()
     except ValueError:
-        return None  # Or handle error as appropriate
+        return None
 
 
 def _map_tmdb_to_filmbase(
@@ -78,7 +78,7 @@ def _map_tmdb_to_filmbase(
         title=item.get(title_key, "N/A"),
         release_date=_parse_release_date(item.get(release_date_key)),
         type="movie" if media_type == "movie" else "series",
-        status="PlanToWatch",  # Default status
+        status="PlanToWatch",
     )
 
 
@@ -149,7 +149,7 @@ async def discover(
 ) -> List[FilmBase]:
     async with httpx.AsyncClient(base_url=str(settings.tmdb_base_url)) as client:
         endpoint = f"/discover/{media_type}"
-        # TMDB uses comma-separated strings for some filters like 'with_genres'
+
         processed_filters = {}
         for key, value in filters.items():
             if isinstance(value, list):
