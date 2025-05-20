@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 from pydantic import BaseModel, Field, HttpUrl, validator
 from datetime import date, datetime
 
-from .models import FilmBase, MetaData
+from models import FilmBase, MetaData
 
 
 class TMDBSettings(BaseSettings):
