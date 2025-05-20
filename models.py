@@ -1,4 +1,4 @@
-from typing import Literal, Optional
+from typing import Dict, List, Literal, Optional
 from datetime import date
 from pydantic import BaseModel
 
@@ -10,6 +10,12 @@ class FilmBase(BaseModel):
     type: Literal["movie", "series"]
     status: Literal["PlanToWatch", "Watching", "Watched", "Dropped", "OnHold"]
     watched_date: Optional[date] = None
+
+
+class FilmBaseResponse(FilmBase):
+    overview: str = ""
+    genres_ids: Optional[List[int]] = None
+    popularity: Optional[float] = None
 
 
 class MetaData(BaseModel):

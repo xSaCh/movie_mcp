@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings
 from pydantic import BaseModel, Field, HttpUrl
 from datetime import date, datetime
 
-from models import FilmBase, MetaData
+from models import FilmBase, FilmBaseResponse, MetaData
 
 
 class TMDBSettings(BaseSettings):
@@ -82,12 +82,32 @@ def _map_tmdb_to_filmbase(
     )
 
 
-async def search(title: str, media_type: Literal["movie", "tv"]) -> List[FilmBase]:
+def _map_tmdb_to_filmbase_response(
+    item: Dict[str, Any], media_type: Literal["movie", "tv"]
+) -> FilmBaseResponse:
+    title_key = "title" if media_type == "movie" else "name"
+    release_date_key = "release_date" if media_type == "movie" else "first_air_date"
+    return FilmBaseResponse(
+        film_id=item["id"],
+        title=item.get(title_key, "N/A"),
+        release_date=_parse_release_date(item.get(release_date_key)),
+        type="movie" if media_type == "movie" else "series",
+        status="PlanToWatch",
+        overview=item.get("overview"),
+        genres_ids=item.get("genre_ids"),
+        popularity=item.get("popularity"),
+    )
+
+
+async def search(
+    title: str, media_type: Literal["movie", "tv"]
+) -> List[FilmBaseResponse]:
     async with httpx.AsyncClient(base_url=str(settings.tmdb_base_url)) as client:
         endpoint = f"/search/{media_type}"
         data = await _make_request(client, "GET", endpoint, params={"query": title})
         return [
-            _map_tmdb_to_filmbase(item, media_type) for item in data.get("results", [])
+            _map_tmdb_to_filmbase_response(item, media_type)
+            for item in data.get("results", [])
         ]
 
 
@@ -146,7 +166,7 @@ async def get_trending(
 
 async def discover(
     media_type: Literal["movie", "tv"], filters: Dict[str, Any]
-) -> List[FilmBase]:
+) -> List[FilmBaseResponse]:
     async with httpx.AsyncClient(base_url=str(settings.tmdb_base_url)) as client:
         endpoint = f"/discover/{media_type}"
 
@@ -159,7 +179,8 @@ async def discover(
 
         data = await _make_request(client, "GET", endpoint, params=processed_filters)
         return [
-            _map_tmdb_to_filmbase(item, media_type) for item in data.get("results", [])
+            _map_tmdb_to_filmbase_response(item, media_type)
+            for item in data.get("results", [])
         ]
 
 

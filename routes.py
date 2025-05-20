@@ -9,6 +9,7 @@ import tmdb_client
 from db import get_db
 from models import (
     FilmBase,
+    FilmBaseResponse,
     MetaData,
     Genre,
 )
@@ -38,7 +39,7 @@ class WatchlistItem(FilmBase):
     genres: Optional[List[str]] = None
 
 
-@router.get("/search", response_model=List[FilmBase])
+@router.get("/search", response_model=List[FilmBaseResponse])
 async def search_tmdb(query: str, type: Literal["movie", "tv"]):
     try:
         return await tmdb_client.search(title=query, media_type=type)
@@ -69,7 +70,7 @@ async def get_tmdb_trending(
         raise HTTPException(status_code=e.response.status_code, detail=str(e))
 
 
-@router.get("/discover/{type}", response_model=List[FilmBase])
+@router.get("/discover/{type}", response_model=List[FilmBaseResponse])
 async def discover_tmdb(type: Literal["movie", "tv"], request: Request):
 
     filters: Dict[str, Any] = dict(request.query_params)
