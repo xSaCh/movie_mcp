@@ -1,4 +1,4 @@
-# MCP Server 🎬
+# MCP Server
 
 A lightweight Model Context Protocol (MCP) server for managing movie/TV series watchlists using TMDB data. Built with FastAPI, raw SQL, and Pydantic.
 
