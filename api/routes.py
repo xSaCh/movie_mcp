@@ -5,9 +5,9 @@ from datetime import date
 import httpx
 from pydantic import BaseModel
 
-import tmdb_client
-from db import get_db
-from models import (
+import api.tmdb_client as tmdb_client
+from api.db import get_db
+from api.models import (
     FilmBase,
     FilmBaseResponse,
     MetaData,
