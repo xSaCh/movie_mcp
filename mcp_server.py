@@ -1,3 +1,4 @@
+import json
 import httpx
 import asyncio
 from typing import Literal, Optional, Dict, Any, List
@@ -18,7 +19,6 @@ mcp = FastMCP(
 FASTAPI_BASE_URL = (
     "http://localhost:8000/api"  # Ensure this matches your FastAPI app's URL
 )
-
 
 # --- Helper for making HTTP requests ---
 async def _call_api(
@@ -71,14 +71,16 @@ async def _call_api(
 
 
 @mcp.tool(name="search_tmdb", description="Search TMDB for movies or TV series.")
-async def search_tmdb_tool(query: str, type: Literal["movie", "tv"]) -> Dict[str, Any]:
+async def search_tmdb_tool(
+    query: str, type: Literal["movie", "tv"]
+) -> List[Dict[str, Any]]:
     """
     Searches TMDB for movies or TV series based on a query.
     Args:
         query: The search query (e.g., movie or series title).
         type: The type of media to search for ('movie' or 'tv').
     Returns:
-        A dictionary containing the search results or an error.
+        A list containing the search results or an error.
     """
     return await _call_api("GET", "/search", params={"query": query, "type": type})
 
@@ -113,7 +115,7 @@ async def get_tmdb_trending_tool(
         type: The type of media ('movie' or 'tv').
         window: The time window for trending items ('day' or 'week').
     Returns:
-        A dictionary containing the list of trending media or an error.
+        A list of trending media or an error.
     """
     return await _call_api("GET", f"/trending/{type}/{window}")
 
@@ -124,14 +126,14 @@ async def get_tmdb_trending_tool(
 )
 async def discover_tmdb_media_tool(
     type: Literal["movie", "tv"], filters: Dict[str, Any]
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
     """
     Discovers media from TMDB based on various filter criteria.
     Args:
         type: The type of media to discover ('movie' or 'tv').
         filters: A dictionary of filter parameters (e.g., {"with_genres": "28", "sort_by": "popularity.desc"}).
     Returns:
-        A dictionary containing the list of discovered media or an error.
+        A list of discovered media or an error.
     """
     return await _call_api("GET", f"/discover/{type}", params=filters)
 
@@ -157,11 +159,11 @@ async def get_tmdb_genres_tool(type: Literal["movie", "tv"]) -> List[Dict[str, A
 @mcp.tool(
     name="get_my_watchlist", description="Retrieve all items from the local watchlist."
 )
-async def get_my_watchlist_tool() -> Dict[str, Any]:
+async def get_my_watchlist_tool() -> List[Dict[str, Any]]:
     """
     Retrieves all films stored in the local watchlist.
     Returns:
-        A dictionary containing the list of watchlist items or an error.
+        A list of watchlist items or an error.
     """
     return await _call_api("GET", "/watchlist")
 
@@ -241,6 +243,5 @@ async def delete_from_my_watchlist_tool(film_id: int) -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(mcp.create_fastapi_app(), host="0.0.0.0", port=8001)
+    mcp.settings.port = 8001
+    mcp.run(transport="sse")
