@@ -32,6 +32,22 @@ uvicorn main:app --reload
 NOTE: Create '.env' and add TMDB_API_KEY variable there
 
 #### MCP Config file (Claude Config compatible)
+- UV (Recommended)
+  Note: Install and configure (uv)[https://docs.astral.sh/uv/guides/tools/] for mcp before excuting
+```json
+{
+  "mcpServers": {
+    "Movie MCP": {
+      "command": "uv",
+      "args": [
+        "run",
+        "mcp", "run", "[path_to_mcp_tmdb]/mcp_server.py"
+      ]
+    }
+  }
+}
+````
+- Hacky way 
 ```json
 {
   "mcpServers": {
@@ -45,3 +61,15 @@ NOTE: Create '.env' and add TMDB_API_KEY variable there
 ```
 Use any Claude mcp config client and add above config. 
 Use [Console-chat-gpt](https://github.com/amidabuddha/console-chat-gpt) CLI based chat MCP Client
+
+Alternatively use (mcptools)[https://github.com/f/mcptools/]
+- List tools 
+```bash
+cd [path_to_movie_mcp]
+mcptools tools uv run mcp run mcp_server.py
+```
+- Search Movie 
+```bash
+cd [path_to_movie_mcp]
+mcptools call search_tmdb --params '{"query":"final destination", "type":"movie"}' uv run mcp run mcp_server.py
+```
